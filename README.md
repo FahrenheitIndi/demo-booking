@@ -1,58 +1,115 @@
-<p align="center"><a href="https://laravel.com" target="_blank"><img src="https://raw.githubusercontent.com/laravel/art/master/logo-lockup/5%20SVG/2%20CMYK/1%20Full%20Color/laravel-logolockup-cmyk-red.svg" width="400" alt="Laravel Logo"></a></p>
+# Бронирование переговорных
 
-<p align="center">
-<a href="https://github.com/laravel/framework/actions"><img src="https://github.com/laravel/framework/workflows/tests/badge.svg" alt="Build Status"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/dt/laravel/framework" alt="Total Downloads"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/v/laravel/framework" alt="Latest Stable Version"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/l/laravel/framework" alt="License"></a>
-</p>
+## Задание
 
-## About Laravel
+### Правила
 
-Laravel is a web application framework with expressive, elegant syntax. We believe development must be an enjoyable and creative experience to be truly fulfilling. Laravel takes the pain out of development by easing common tasks used in many web projects, such as:
+- Можно использовать любые ИИ-инструменты: чат-ассистенты, агенты в IDE, CLI-агенты. Это не снижает оценку, но и не повышает её: мы оцениваем результат и то, как вы проверяете код, в том числе сгенерированный. Работать без ИИ тоже нормально.
+- Стек: PHP 8.4, Laravel 13, PostgreSQL.
+- Коммитьте по ходу работы: по истории мы смотрим, как развивалось решение. Оцениваем осмысленность коммитов, а не их количество.
+- На следующем этапе вы объясните решение и внесёте в него небольшое изменение во время звонка. Код, который вы не можете объяснить, считается невыполненным.
 
-- [Simple, fast routing engine](https://laravel.com/docs/routing).
-- [Powerful dependency injection container](https://laravel.com/docs/container).
-- Multiple back-ends for [session](https://laravel.com/docs/session) and [cache](https://laravel.com/docs/cache) storage.
-- Expressive, intuitive [database ORM](https://laravel.com/docs/eloquent).
-- Database agnostic [schema migrations](https://laravel.com/docs/migrations).
-- [Robust background job processing](https://laravel.com/docs/queues).
-- [Real-time event broadcasting](https://laravel.com/docs/broadcasting).
+### Задача
 
-Laravel is accessible, powerful, and provides tools required for large, robust applications.
+В компании два офиса: Москва (Europe/Moscow) и Новосибирск (Asia/Novosibirsk), в каждом есть переговорные. Предыдущий разработчик написал API бронирования, и пользователи жалуются на ошибки. Код — в `app/Http/Controllers/BookingController.php`.
 
-## Learning Laravel
+### Часть 1. Ревью
 
-Laravel has the most extensive and thorough [documentation](https://laravel.com/docs) and video tutorial library of all modern web application frameworks, making it a breeze to get started with the framework.
+Составьте `REVIEW.md`: перечислите проблемы, для каждой — серьёзность (critical / major / minor) и как исправить. Если место выглядит подозрительно, но проблемой не является, — тоже напишите об этом.
 
-In addition, [Laracasts](https://laracasts.com) contains thousands of video tutorials on a range of topics including Laravel, modern PHP, unit testing, and JavaScript. Boost your skills by digging into our comprehensive video library.
+### Часть 2. Доработка
 
-You can also watch bite-sized lessons with real-world projects on [Laravel Learn](https://laravel.com/learn), where you will be guided through building a Laravel application from scratch while learning PHP fundamentals.
+Исправьте `store` и `destroy` так, чтобы выполнялись правила:
 
-## Agentic Development
+- Брони одной комнаты не пересекаются. Встречи «впритык» разрешены: 10:00–11:00 и 11:00–12:00 — это не пересечение.
+- Длительность от 15 минут до 4 часов, шаг 15 минут (10:00, 10:15…).
+- Бронь целиком укладывается в рабочее время 09:00–20:00 по местному времени офиса, где находится комната. Клиент присылает время в ISO 8601 с любым смещением.
+- Отменить бронь может только её автор.
+- Понятные ошибки валидации (422).
+- Других ограничений на даты нет.
+- Feature-тесты на все правила выше.
 
-Laravel's predictable structure and conventions make it ideal for AI coding agents like Claude Code, Cursor, and GitHub Copilot. Install [Laravel Boost](https://laravel.com/docs/ai) to supercharge your AI workflow:
+Можно менять модели и миграции и добавлять свои классы. Методы `index` и `today` исправлять не нужно, их достаточно разобрать в ревью.
 
-```bash
-composer require laravel/boost --dev
+Бонус: при двух одновременных запросах на один слот может создаться двойная бронь. В основной части достаточно, чтобы брони не пересекались при последовательных запросах. Гонку исправьте или опишите в README, как бы вы это сделали.
 
-php artisan boost:install
+### Часть 3. `AI_NOTES.md`
+
+Коротко ответьте на вопросы ниже. Если работали без ИИ, вместо этого кратко опишите, как проверяли решение, какие ошибки обнаружили и какие решения приняли.
+
+1. Какие инструменты использовали и 2–3 ключевых промпта дословно.
+2. Случай, где ИИ ошибся или предложил неоптимальное решение, и как вы это заметили. Если такого не было — какое предложение ИИ вы перепроверили и как.
+3. Что вы проверили вручную и что сознательно не доверили ИИ.
+
+Если инструмент позволяет экспортировать историю диалога — приложите её, это необязательно.
+
+### Что сдать
+
+- Ссылку на репозиторий с кодом, историей коммитов, `REVIEW.md`, `AI_NOTES.md` и README. Если репозиторий приватный, добавьте в соавторы (Settings → Collaborators) аккаунт `rcsi-science`. Вместо ссылки можно прислать архив, но обязательно с папкой `.git`: по ней мы смотрим историю коммитов.
+- В README: как запустить проект и тесты одной-двумя командами.
+
+## Запуск
+
+Нужны Docker и Docker Compose.
+
+```sh
+docker compose up -d --wait
+docker compose exec app php artisan migrate:fresh --seed
 ```
 
-Boost provides your agent 15+ tools and skills that help agents build Laravel applications while following best practices.
+Первый запуск занимает несколько минут: контейнер устанавливает зависимости. API доступно по адресу `http://localhost:8000/api`.
 
-## Contributing
+## Тесты
 
-Thank you for considering contributing to the Laravel framework! The contribution guide can be found in the [Laravel documentation](https://laravel.com/docs/contributions).
+```sh
+docker compose exec app php artisan test
+```
 
-## Code of Conduct
+Тесты идут на PostgreSQL в отдельной базе `testing`.
 
-In order to ensure that the Laravel community is welcoming to all, please review and abide by the [Code of Conduct](https://laravel.com/docs/contributions#code-of-conduct).
+## ИИ-агенты
 
-## Security Vulnerabilities
+В проекте установлен [Laravel Boost](https://laravel.com/docs/boost): правила для агентов лежат в `AGENTS.md` и `CLAUDE.md`. Скиллы и MCP-сервер для своего агента можно подключить командой:
 
-If you discover a security vulnerability within Laravel, please send an e-mail to Taylor Otwell via [taylor@laravel.com](mailto:taylor@laravel.com). All security vulnerabilities will be promptly addressed.
+```sh
+docker compose exec app php artisan boost:install
+```
 
-## License
+MCP-сервер Boost запускается на вашей машине, а не в контейнере, поэтому его инструменты для базы данных не видят PostgreSQL.
 
-The Laravel framework is open-sourced software licensed under the [MIT license](https://opensource.org/licenses/MIT).
+## Данные сидера
+
+| Офис | Часовой пояс | Комнаты (id) |
+| --- | --- | --- |
+| Москва | Europe/Moscow | Арбат (1), Тверская (2), Остоженка (3) |
+| Новосибирск | Asia/Novosibirsk | Обь (4), Академгородок (5) |
+
+| Пользователь | id | Токен |
+| --- | --- | --- |
+| Анна | 1 | `anna-token` |
+| Борис | 2 | `boris-token` |
+
+Токены постоянные только для демонстрации.
+
+## API
+
+Все методы требуют заголовки `Authorization: Bearer <токен>` и `Accept: application/json`. Без `Accept` запрос без токена вернёт 500 вместо 401.
+
+| Метод | Адрес | Что делает |
+| --- | --- | --- |
+| GET | `/api/bookings` | Мои брони |
+| POST | `/api/bookings` | Создать бронь |
+| DELETE | `/api/bookings/{id}` | Отменить бронь |
+| GET | `/api/rooms/{room}/bookings/today` | Брони комнаты на сегодня |
+
+Пример:
+
+```sh
+curl -X POST http://localhost:8000/api/bookings \
+  -H "Authorization: Bearer anna-token" \
+  -H "Accept: application/json" \
+  -H "Content-Type: application/json" \
+  -d '{"room_id": 1, "user_id": 1, "title": "Планёрка", "starts_at": "2026-11-02T10:00:00+03:00", "ends_at": "2026-11-02T11:00:00+03:00"}'
+```
+
+Лог созданных броней пишется в `storage/logs/bookings.log`.
