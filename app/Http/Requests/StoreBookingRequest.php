@@ -32,6 +32,26 @@ class StoreBookingRequest extends FormRequest
     }
 
     /**
+     * @return array<string, string>
+     */
+    public function messages(): array
+    {
+        return [
+            'room_id.required' => 'Укажите комнату',
+            'room_id.integer' => 'Идентификатор комнаты должен быть числом',
+            'room_id.exists' => 'Такой комнаты нет',
+            'title.required' => 'Укажите название встречи',
+            'title.string' => 'Название должно быть строкой',
+            'title.max' => 'Название не длиннее :max символов',
+            'starts_at.required' => 'Укажите время начала',
+            'starts_at.date' => 'Время начала должно быть датой в формате ISO 8601',
+            'ends_at.required' => 'Укажите время окончания',
+            'ends_at.date' => 'Время окончания должно быть датой в формате ISO 8601',
+            'ends_at.after' => 'Время окончания должно быть позже начала',
+        ];
+    }
+
+    /**
      * Бизнес-правила, которым нужны уже распарсенные даты: проверяются после базовых правил.
      *
      * @return list<callable(Validator): void>

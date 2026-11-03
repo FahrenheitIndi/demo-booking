@@ -65,7 +65,12 @@ class BookingStoreTest extends TestCase
 
         $this->postJson('/api/bookings', [])
             ->assertUnprocessable()
-            ->assertJsonValidationErrors(['room_id', 'title', 'starts_at', 'ends_at']);
+            ->assertJsonValidationErrors([
+                'room_id' => 'Укажите комнату',
+                'title' => 'Укажите название встречи',
+                'starts_at' => 'Укажите время начала',
+                'ends_at' => 'Укажите время окончания',
+            ]);
         $this->assertDatabaseCount('bookings', 0);
     }
 
@@ -75,7 +80,7 @@ class BookingStoreTest extends TestCase
 
         $this->postBooking(['room_id' => 999])
             ->assertUnprocessable()
-            ->assertJsonValidationErrors(['room_id']);
+            ->assertJsonValidationErrors(['room_id' => 'Такой комнаты нет']);
         $this->assertDatabaseCount('bookings', 0);
     }
 
@@ -88,7 +93,7 @@ class BookingStoreTest extends TestCase
             'ends_at' => '2026-11-10T10:00:00+03:00',
         ])
             ->assertUnprocessable()
-            ->assertJsonValidationErrors(['ends_at']);
+            ->assertJsonValidationErrors(['ends_at' => 'позже начала']);
         $this->assertDatabaseCount('bookings', 0);
     }
 
@@ -98,7 +103,7 @@ class BookingStoreTest extends TestCase
 
         $this->postBooking(['starts_at' => 'завтра'])
             ->assertUnprocessable()
-            ->assertJsonValidationErrors(['starts_at']);
+            ->assertJsonValidationErrors(['starts_at' => 'ISO 8601']);
         $this->assertDatabaseCount('bookings', 0);
     }
 
