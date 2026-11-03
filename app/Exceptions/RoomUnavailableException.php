@@ -2,6 +2,7 @@
 
 namespace App\Exceptions;
 
+use Illuminate\Contracts\Debug\ShouldntReport;
 use Illuminate\Database\QueryException;
 use RuntimeException;
 
@@ -9,8 +10,9 @@ use RuntimeException;
  * Комната уже занята на запрошенный интервал. Единственный источник этого
  * правила — exclusion constraint bookings_no_overlap в PostgreSQL, поэтому
  * исключение рождается из ошибки БД, а не из предварительной проверки.
+ * Это штатный исход, а не сбой, поэтому в лог ошибок не попадает (ShouldntReport).
  */
-class RoomUnavailableException extends RuntimeException
+class RoomUnavailableException extends RuntimeException implements ShouldntReport
 {
     private const string EXCLUSION_VIOLATION_SQLSTATE = '23P01';
 

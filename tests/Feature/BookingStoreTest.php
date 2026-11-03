@@ -2,10 +2,12 @@
 
 namespace Tests\Feature;
 
+use App\Exceptions\RoomUnavailableException;
 use App\Models\Booking;
 use App\Models\Office;
 use App\Models\Room;
 use App\Models\User;
+use Illuminate\Contracts\Debug\ExceptionHandler;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Testing\TestResponse;
 use Laravel\Sanctum\Sanctum;
@@ -105,6 +107,26 @@ class BookingStoreTest extends TestCase
             ->assertUnprocessable()
             ->assertJsonValidationErrors(['starts_at' => 'ISO 8601']);
         $this->assertDatabaseCount('bookings', 0);
+    }
+
+    public function test_returns_422_when_time_has_no_offset(): void
+    {
+        Sanctum::actingAs(User::factory()->create());
+
+        $this->postBooking([
+            'starts_at' => '2026-11-10T10:00:00',
+            'ends_at' => '2026-11-10T11:00:00',
+        ])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors(['starts_at' => 'смещение', 'ends_at' => 'смещение']);
+        $this->assertDatabaseCount('bookings', 0);
+    }
+
+    public function test_room_conflict_is_not_reported_as_an_error(): void
+    {
+        $handler = $this->app->make(ExceptionHandler::class);
+
+        $this->assertFalse($handler->shouldReport(new RoomUnavailableException('Комната занята')));
     }
 
     public function test_allows_booking_in_the_past(): void

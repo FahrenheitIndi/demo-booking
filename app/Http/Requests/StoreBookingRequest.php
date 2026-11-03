@@ -6,6 +6,7 @@ use App\Models\Booking;
 use App\Models\Office;
 use App\Models\Room;
 use Carbon\CarbonImmutable;
+use Closure;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Validator;
 
@@ -19,16 +20,27 @@ class StoreBookingRequest extends FormRequest
     }
 
     /**
-     * @return array<string, list<string>>
+     * @return array<string, list<string|Closure>>
      */
     public function rules(): array
     {
         return [
             'room_id' => ['required', 'integer', 'exists:rooms,id'],
             'title' => ['required', 'string', 'max:255'],
-            'starts_at' => ['required', 'date'],
-            'ends_at' => ['required', 'date', 'after:starts_at'],
+            'starts_at' => ['bail', 'required', 'date', $this->requireOffset(...)],
+            'ends_at' => ['bail', 'required', 'date', $this->requireOffset(...), 'after:starts_at'],
         ];
+    }
+
+    /**
+     * Без смещения строка была бы молча прочитана как UTC и бронь сдвинулась бы
+     * на разницу с поясом клиента. Лучше честный 422.
+     */
+    private function requireOffset(string $attribute, mixed $value, Closure $fail): void
+    {
+        if (! isset(date_parse((string) $value)['zone_type'])) {
+            $fail('Укажите смещение часового пояса, например +03:00 или Z');
+        }
     }
 
     /**
