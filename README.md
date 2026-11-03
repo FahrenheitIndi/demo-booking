@@ -112,7 +112,7 @@ curl -X POST http://localhost:8000/api/bookings \
   -d '{"room_id": 1, "title": "Планёрка", "starts_at": "2026-11-02T10:00:00+03:00", "ends_at": "2026-11-02T11:00:00+03:00"}'
 ```
 
-Автор брони — владелец токена, `user_id` в теле игнорируется. Время принимается в ISO 8601 с любым смещением и хранится в UTC.
+Автор брони — владелец токена, `user_id` в теле игнорируется. Время принимается в ISO 8601 с любым смещением и хранится в UTC в колонках `timestamptz`: это момент времени, а не «стенные часы», поэтому и литерал со смещением в SQL сравнивается правильно. Сессия базы закреплена в UTC в конфиге соединения.
 
 Ответы `POST /api/bookings`:
 
@@ -132,7 +132,7 @@ curl -X POST http://localhost:8000/api/bookings \
 
 ```sql
 ALTER TABLE bookings ADD CONSTRAINT bookings_no_overlap
-EXCLUDE USING gist (room_id WITH =, tsrange(starts_at, ends_at, '[)') WITH &&)
+EXCLUDE USING gist (room_id WITH =, tstzrange(starts_at, ends_at, '[)') WITH &&)
 ```
 
 Приложение не делает `SELECT` перед вставкой: оно просто вставляет, а при нарушении ограничения (SQLSTATE `23P01` с именем `bookings_no_overlap`) превращает `QueryException` в `RoomUnavailableException` и отдаёт 409. При двух одновременных запросах на один слот PostgreSQL придержит вторую транзакцию до коммита первой и затем отклонит её — двойная бронь невозможна ни при каком порядке запросов. Полуоткрытый интервал `[)` разрешает встречи «впритык». Непересекающиеся брони одной комнаты друг друга не ждут.
@@ -147,7 +147,7 @@ EXCLUDE USING gist (room_id WITH =, tsrange(starts_at, ends_at, '[)') WITH &&)
 ```sql
 SELECT a.id, b.id FROM bookings a
 JOIN bookings b ON a.room_id = b.room_id AND a.id < b.id
-WHERE tsrange(a.starts_at, a.ends_at, '[)') && tsrange(b.starts_at, b.ends_at, '[)');
+WHERE tstzrange(a.starts_at, a.ends_at, '[)') && tstzrange(b.starts_at, b.ends_at, '[)');
 ```
 
 Ограничение строит GiST-индекс под `ACCESS EXCLUSIVE`, на большой таблице это короткое окно без записи в `bookings`.
