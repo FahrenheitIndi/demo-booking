@@ -139,7 +139,7 @@ class StoreBookingRequest extends FormRequest
 
     private function isOnGrid(CarbonImmutable $moment): bool
     {
-        return $moment->second === 0 && $moment->minute % Booking::STEP_MINUTES === 0;
+        return $moment->micro === 0 && $moment->second === 0 && $moment->minute % Booking::STEP_MINUTES === 0;
     }
 
     /**

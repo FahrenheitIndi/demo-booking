@@ -4,14 +4,14 @@ namespace App\Policies;
 
 use App\Models\Booking;
 use App\Models\User;
+use Illuminate\Auth\Access\Response;
 
 class BookingPolicy
 {
-    /**
-     * Отменить бронь может только её автор.
-     */
-    public function delete(User $user, Booking $booking): bool
+    public function delete(User $user, Booking $booking): Response
     {
-        return $user->id === $booking->user_id;
+        return $user->id === $booking->user_id
+            ? Response::allow()
+            : Response::deny('Отменить бронь может только её автор');
     }
 }

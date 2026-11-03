@@ -28,7 +28,9 @@ class BookingDestroyTest extends TestCase
         $booking = Booking::factory()->create();
         Sanctum::actingAs(User::factory()->create());
 
-        $this->deleteJson("/api/bookings/{$booking->id}")->assertForbidden();
+        $this->deleteJson("/api/bookings/{$booking->id}")
+            ->assertForbidden()
+            ->assertJsonPath('message', 'Отменить бронь может только её автор');
 
         $this->assertModelExists($booking);
     }
