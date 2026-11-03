@@ -97,6 +97,8 @@ return [
             'prefix_indexes' => true,
             'search_path' => 'public',
             'sslmode' => env('DB_SSLMODE', 'prefer'),
+            // Laravel пишет даты без смещения, а timestamptz трактует их в поясе сессии — закрепляем UTC.
+            'timezone' => 'UTC',
         ],
 
         'sqlsrv' => [
