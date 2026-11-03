@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Models\Booking;
 use App\Models\Office;
 use App\Models\Room;
 use App\Models\User;
@@ -214,6 +215,73 @@ class BookingStoreTest extends TestCase
         ])->assertCreated();
 
         $this->assertDatabaseCount('bookings', 1);
+    }
+
+    /**
+     * Существующая бронь 10:00–11:00 по Москве (07:00–08:00 UTC в базе), запрос с московским смещением.
+     *
+     * @return array<string, array{string, string}>
+     */
+    public static function overlappingRequests(): array
+    {
+        return [
+            'starts inside existing' => ['2026-11-10T10:30:00+03:00', '2026-11-10T11:30:00+03:00'],
+            'ends inside existing' => ['2026-11-10T09:30:00+03:00', '2026-11-10T10:30:00+03:00'],
+            'inside existing' => ['2026-11-10T10:15:00+03:00', '2026-11-10T10:45:00+03:00'],
+            'covers existing' => ['2026-11-10T09:00:00+03:00', '2026-11-10T12:00:00+03:00'],
+            'same slot' => ['2026-11-10T10:00:00+03:00', '2026-11-10T11:00:00+03:00'],
+        ];
+    }
+
+    #[DataProvider('overlappingRequests')]
+    public function test_returns_409_when_room_is_already_booked(string $startsAt, string $endsAt): void
+    {
+        Sanctum::actingAs(User::factory()->create());
+        $room = $this->room();
+        Booking::factory()->for($room)->create([
+            'starts_at' => '2026-11-10 07:00:00',
+            'ends_at' => '2026-11-10 08:00:00',
+        ]);
+
+        $this->postBooking(['room_id' => $room->id, 'starts_at' => $startsAt, 'ends_at' => $endsAt])
+            ->assertConflict()
+            ->assertJsonPath('message', 'Комната занята в это время');
+        $this->assertDatabaseCount('bookings', 1);
+    }
+
+    public function test_allows_back_to_back_bookings_in_same_room(): void
+    {
+        Sanctum::actingAs(User::factory()->create());
+        $room = $this->room();
+        Booking::factory()->for($room)->create([
+            'starts_at' => '2026-11-10 07:00:00',
+            'ends_at' => '2026-11-10 08:00:00',
+        ]);
+
+        $this->postBooking([
+            'room_id' => $room->id,
+            'starts_at' => '2026-11-10T11:00:00+03:00',
+            'ends_at' => '2026-11-10T12:00:00+03:00',
+        ])->assertCreated();
+
+        $this->assertDatabaseCount('bookings', 2);
+    }
+
+    public function test_allows_same_time_in_another_room(): void
+    {
+        Sanctum::actingAs(User::factory()->create());
+        Booking::factory()->for($this->room())->create([
+            'starts_at' => '2026-11-10 07:00:00',
+            'ends_at' => '2026-11-10 08:00:00',
+        ]);
+
+        $this->postBooking([
+            'room_id' => $this->room()->id,
+            'starts_at' => '2026-11-10T10:00:00+03:00',
+            'ends_at' => '2026-11-10T11:00:00+03:00',
+        ])->assertCreated();
+
+        $this->assertDatabaseCount('bookings', 2);
     }
 
     private function room(bool $inNovosibirsk = false): Room
