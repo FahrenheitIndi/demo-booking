@@ -14,6 +14,14 @@ class Booking extends Model
     /** @use HasFactory<BookingFactory> */
     use HasFactory;
 
+    public const int MAX_DURATION_MINUTES = 240;
+
+    /**
+     * Начало и конец брони должны попадать на сетку с этим шагом (10:00, 10:15…).
+     * Минимальная длительность 15 минут следует из шага: обе границы на сетке и конец позже начала.
+     */
+    public const int STEP_MINUTES = 15;
+
     protected function casts(): array
     {
         return [
