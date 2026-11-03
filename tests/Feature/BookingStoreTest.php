@@ -9,14 +9,27 @@ use App\Models\Room;
 use App\Models\User;
 use Illuminate\Contracts\Debug\ExceptionHandler;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Testing\TestResponse;
 use Laravel\Sanctum\Sanctum;
+use Monolog\Handler\TestHandler;
 use PHPUnit\Framework\Attributes\DataProvider;
 use Tests\TestCase;
 
 class BookingStoreTest extends TestCase
 {
     use RefreshDatabase;
+
+    /**
+     * Канал bookings пишет в storage/logs/bookings.log абсолютным путём; в тестах
+     * заменяем его на in-memory handler, чтобы не засорять файл и проверять записи.
+     */
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        config(['logging.channels.bookings' => ['driver' => 'monolog', 'handler' => TestHandler::class]]);
+    }
 
     public function test_valid_request_creates_booking_and_returns_201(): void
     {
@@ -127,6 +140,34 @@ class BookingStoreTest extends TestCase
         $handler = $this->app->make(ExceptionHandler::class);
 
         $this->assertFalse($handler->shouldReport(new RoomUnavailableException('Комната занята')));
+    }
+
+    public function test_logs_created_booking_with_its_id_to_bookings_channel(): void
+    {
+        $user = User::factory()->create();
+        Sanctum::actingAs($user);
+
+        $bookingId = $this->postBooking()->assertCreated()->json('id');
+
+        $records = $this->bookingsLogHandler()->getRecords();
+        $this->assertCount(1, $records);
+        $this->assertSame('Booking created', $records[0]->message);
+        $this->assertSame($bookingId, $records[0]->context['booking_id']);
+        $this->assertSame($user->id, $records[0]->context['user_id']);
+    }
+
+    public function test_does_not_log_when_room_is_already_booked(): void
+    {
+        Sanctum::actingAs(User::factory()->create());
+        $room = $this->room();
+        Booking::factory()->for($room)->create([
+            'starts_at' => '2026-11-10 07:00:00',
+            'ends_at' => '2026-11-10 08:00:00',
+        ]);
+
+        $this->postBooking(['room_id' => $room->id])->assertConflict();
+
+        $this->assertFalse($this->bookingsLogHandler()->hasInfoRecords());
     }
 
     public function test_allows_booking_in_the_past(): void
@@ -309,6 +350,14 @@ class BookingStoreTest extends TestCase
         ])->assertCreated();
 
         $this->assertDatabaseCount('bookings', 2);
+    }
+
+    private function bookingsLogHandler(): TestHandler
+    {
+        $handler = Log::channel('bookings')->getLogger()->getHandlers()[0];
+        $this->assertInstanceOf(TestHandler::class, $handler);
+
+        return $handler;
     }
 
     private function room(bool $inNovosibirsk = false): Room
