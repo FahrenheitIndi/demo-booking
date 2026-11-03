@@ -7,6 +7,7 @@ use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Testing\TestResponse;
 use Laravel\Sanctum\Sanctum;
+use PHPUnit\Framework\Attributes\DataProvider;
 use Tests\TestCase;
 
 class BookingStoreTest extends TestCase
@@ -107,6 +108,54 @@ class BookingStoreTest extends TestCase
             'starts_at' => '2020-03-02T10:00:00+03:00',
             'ends_at' => '2020-03-02T11:00:00+03:00',
         ])->assertCreated();
+
+        $this->assertDatabaseCount('bookings', 1);
+    }
+
+    /**
+     * @return array<string, array{string, string, string, string}>
+     */
+    public static function invalidDurationsAndSteps(): array
+    {
+        return [
+            'start not on 15-minute grid' => ['2026-11-10T10:05:00+03:00', '2026-11-10T11:05:00+03:00', 'starts_at', 'кратно 15 минутам'],
+            'start with seconds' => ['2026-11-10T10:00:30+03:00', '2026-11-10T11:00:30+03:00', 'starts_at', 'кратно 15 минутам'],
+            'end not on 15-minute grid' => ['2026-11-10T10:00:00+03:00', '2026-11-10T10:50:00+03:00', 'ends_at', 'кратно 15 минутам'],
+            'shorter than 15 minutes' => ['2026-11-10T10:00:00+03:00', '2026-11-10T10:10:00+03:00', 'ends_at', 'кратно 15 минутам'],
+            'longer than 4 hours' => ['2026-11-10T10:00:00+03:00', '2026-11-10T14:15:00+03:00', 'ends_at', 'Максимальная длительность 4 часа'],
+        ];
+    }
+
+    #[DataProvider('invalidDurationsAndSteps')]
+    public function test_returns_422_for_invalid_duration_or_step(string $startsAt, string $endsAt, string $field, string $message): void
+    {
+        Sanctum::actingAs(User::factory()->create());
+
+        $this->postBooking(['starts_at' => $startsAt, 'ends_at' => $endsAt])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors([$field => $message]);
+        $this->assertDatabaseCount('bookings', 0);
+    }
+
+    /**
+     * @return array<string, array{string, string}>
+     */
+    public static function validDurationsAndSteps(): array
+    {
+        return [
+            'exactly 15 minutes' => ['2026-11-10T10:00:00+03:00', '2026-11-10T10:15:00+03:00'],
+            'exactly 4 hours' => ['2026-11-10T10:00:00+03:00', '2026-11-10T14:00:00+03:00'],
+            'start at :45' => ['2026-11-10T10:45:00+03:00', '2026-11-10T11:30:00+03:00'],
+            'half-hour client offset' => ['2026-11-10T14:00:00+05:30', '2026-11-10T15:00:00+05:30'],
+        ];
+    }
+
+    #[DataProvider('validDurationsAndSteps')]
+    public function test_allows_valid_duration_and_step(string $startsAt, string $endsAt): void
+    {
+        Sanctum::actingAs(User::factory()->create());
+
+        $this->postBooking(['starts_at' => $startsAt, 'ends_at' => $endsAt])->assertCreated();
 
         $this->assertDatabaseCount('bookings', 1);
     }
