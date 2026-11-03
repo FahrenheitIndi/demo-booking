@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Models\Office;
 use App\Models\Room;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -158,6 +159,68 @@ class BookingStoreTest extends TestCase
         $this->postBooking(['starts_at' => $startsAt, 'ends_at' => $endsAt])->assertCreated();
 
         $this->assertDatabaseCount('bookings', 1);
+    }
+
+    /**
+     * @return array<string, array{string, string, bool}>
+     */
+    public static function bookingsOutsideWorkingHours(): array
+    {
+        return [
+            'moscow before opening' => ['2026-11-10T08:45:00+03:00', '2026-11-10T09:45:00+03:00', false],
+            'moscow ending after closing' => ['2026-11-10T19:30:00+03:00', '2026-11-10T20:15:00+03:00', false],
+            'moscow at 06:00 local sent with moscow offset' => ['2026-11-10T06:00:00+03:00', '2026-11-10T07:00:00+03:00', false],
+            'novosibirsk night even though utc day is working' => ['2026-11-10T22:00:00Z', '2026-11-10T23:00:00Z', true],
+        ];
+    }
+
+    #[DataProvider('bookingsOutsideWorkingHours')]
+    public function test_returns_422_outside_office_working_hours(string $startsAt, string $endsAt, bool $inNovosibirsk): void
+    {
+        Sanctum::actingAs(User::factory()->create());
+
+        $this->postBooking([
+            'room_id' => $this->room($inNovosibirsk)->id,
+            'starts_at' => $startsAt,
+            'ends_at' => $endsAt,
+        ])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors(['starts_at' => 'рабочее время 09:00–20:00']);
+        $this->assertDatabaseCount('bookings', 0);
+    }
+
+    /**
+     * @return array<string, array{string, string, bool}>
+     */
+    public static function bookingsInsideWorkingHours(): array
+    {
+        return [
+            'moscow at opening' => ['2026-11-10T09:00:00+03:00', '2026-11-10T10:00:00+03:00', false],
+            'moscow ending at closing' => ['2026-11-10T19:00:00+03:00', '2026-11-10T20:00:00+03:00', false],
+            'novosibirsk 10:00 local sent with moscow offset' => ['2026-11-10T06:00:00+03:00', '2026-11-10T07:00:00+03:00', true],
+            'novosibirsk 09:00 local sent in utc' => ['2026-11-10T02:00:00Z', '2026-11-10T03:00:00Z', true],
+        ];
+    }
+
+    #[DataProvider('bookingsInsideWorkingHours')]
+    public function test_allows_booking_inside_office_working_hours(string $startsAt, string $endsAt, bool $inNovosibirsk): void
+    {
+        Sanctum::actingAs(User::factory()->create());
+
+        $this->postBooking([
+            'room_id' => $this->room($inNovosibirsk)->id,
+            'starts_at' => $startsAt,
+            'ends_at' => $endsAt,
+        ])->assertCreated();
+
+        $this->assertDatabaseCount('bookings', 1);
+    }
+
+    private function room(bool $inNovosibirsk = false): Room
+    {
+        $office = $inNovosibirsk ? Office::factory()->novosibirsk() : Office::factory();
+
+        return Room::factory()->for($office)->create();
     }
 
     /**

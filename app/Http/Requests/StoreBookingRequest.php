@@ -3,6 +3,7 @@
 namespace App\Http\Requests;
 
 use App\Models\Booking;
+use App\Models\Office;
 use App\Models\Room;
 use Carbon\CarbonImmutable;
 use Illuminate\Foundation\Http\FormRequest;
@@ -39,7 +40,24 @@ class StoreBookingRequest extends FormRequest
     {
         return [
             $this->validateDurationAndStep(...),
+            $this->validateWorkingHours(...),
         ];
+    }
+
+    private function validateWorkingHours(Validator $validator): void
+    {
+        if ($validator->errors()->hasAny(['room_id', 'starts_at', 'ends_at'])) {
+            return;
+        }
+
+        $office = $this->room()->office;
+
+        if (! $office->coversWorkingHours($this->startsAt(), $this->endsAt())) {
+            $validator->errors()->add(
+                'starts_at',
+                'Бронь должна укладываться в рабочее время '.Office::OPENS_AT.'–'.Office::CLOSES_AT." по времени офиса {$office->name}",
+            );
+        }
     }
 
     private function validateDurationAndStep(Validator $validator): void
