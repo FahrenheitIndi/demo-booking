@@ -12,6 +12,8 @@ use Illuminate\Validation\Validator;
 
 class StoreBookingRequest extends FormRequest
 {
+    private const string TIME_FORMAT_MESSAGE = 'Время должно быть в формате ISO 8601 со смещением, например 2026-11-10T10:00:00+03:00';
+
     private ?Room $room = null;
 
     public function authorize(): bool
@@ -28,18 +30,19 @@ class StoreBookingRequest extends FormRequest
             'room_id' => ['required', 'integer', 'exists:rooms,id'],
             'title' => ['required', 'string', 'max:255'],
             'starts_at' => ['bail', 'required', 'date', $this->requireOffset(...)],
-            'ends_at' => ['bail', 'required', 'date', $this->requireOffset(...), 'after:starts_at'],
+            'ends_at' => ['bail', 'required', 'date', $this->requireOffset(...)],
         ];
     }
 
     /**
      * Без смещения строка была бы молча прочитана как UTC и бронь сдвинулась бы
-     * на разницу с поясом клиента. Лучше честный 422.
+     * на разницу с поясом клиента. Лучше честный 422. Это ошибка контракта,
+     * адресована разработчику клиента, а не пользователю формы.
      */
     private function requireOffset(string $attribute, mixed $value, Closure $fail): void
     {
         if (! isset(date_parse((string) $value)['zone_type'])) {
-            $fail('Укажите смещение часового пояса, например +03:00 или Z');
+            $fail(self::TIME_FORMAT_MESSAGE);
         }
     }
 
@@ -56,10 +59,9 @@ class StoreBookingRequest extends FormRequest
             'title.string' => 'Название должно быть строкой',
             'title.max' => 'Название не длиннее :max символов',
             'starts_at.required' => 'Укажите время начала',
-            'starts_at.date' => 'Время начала должно быть датой в формате ISO 8601',
+            'starts_at.date' => self::TIME_FORMAT_MESSAGE,
             'ends_at.required' => 'Укажите время окончания',
-            'ends_at.date' => 'Время окончания должно быть датой в формате ISO 8601',
-            'ends_at.after' => 'Время окончания должно быть позже начала',
+            'ends_at.date' => self::TIME_FORMAT_MESSAGE,
         ];
     }
 
@@ -71,9 +73,25 @@ class StoreBookingRequest extends FormRequest
     public function after(): array
     {
         return [
+            $this->validateEndIsAfterStart(...),
             $this->validateDurationAndStep(...),
             $this->validateWorkingHours(...),
         ];
+    }
+
+    /**
+     * Не правило after:starts_at в rules(): оно сравнивало бы ends_at с ещё
+     * не проверенной строкой starts_at и давало ложную вторую ошибку.
+     */
+    private function validateEndIsAfterStart(Validator $validator): void
+    {
+        if ($validator->errors()->hasAny(['starts_at', 'ends_at'])) {
+            return;
+        }
+
+        if ($this->endsAt()->lessThanOrEqualTo($this->startsAt())) {
+            $validator->errors()->add('ends_at', 'Время окончания должно быть позже начала');
+        }
     }
 
     private function validateWorkingHours(Validator $validator): void

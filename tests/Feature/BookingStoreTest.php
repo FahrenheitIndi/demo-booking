@@ -131,8 +131,21 @@ class BookingStoreTest extends TestCase
             'ends_at' => '2026-11-10T11:00:00',
         ])
             ->assertUnprocessable()
-            ->assertJsonValidationErrors(['starts_at' => 'смещение', 'ends_at' => 'смещение']);
+            ->assertJsonValidationErrors(['starts_at' => 'смещением', 'ends_at' => 'смещением']);
         $this->assertDatabaseCount('bookings', 0);
+    }
+
+    public function test_reports_only_the_invalid_field_when_start_is_malformed(): void
+    {
+        Sanctum::actingAs(User::factory()->create());
+
+        $this->postBooking([
+            'starts_at' => '2026-11-10T10:00:00',
+            'ends_at' => '2026-11-10T11:00:00+03:00',
+        ])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors(['starts_at'])
+            ->assertJsonMissingValidationErrors(['ends_at']);
     }
 
     public function test_room_conflict_is_not_reported_as_an_error(): void
@@ -374,11 +387,12 @@ class BookingStoreTest extends TestCase
      */
     private function postBooking(array $overrides = []): TestResponse
     {
-        return $this->postJson('/api/bookings', array_merge([
-            'room_id' => Room::factory()->create()->id,
+        $overrides['room_id'] ??= Room::factory()->create()->id;
+
+        return $this->postJson('/api/bookings', $overrides + [
             'title' => 'Планёрка',
             'starts_at' => '2026-11-10T10:00:00+03:00',
             'ends_at' => '2026-11-10T11:00:00+03:00',
-        ], $overrides));
+        ]);
     }
 }
